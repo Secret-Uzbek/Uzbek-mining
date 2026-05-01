@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-type: software
+type: dataset
 title: "Uzbek-mining"
 authors:
   - family-names: Abdukarimov
@@ -8,13 +8,13 @@ authors:
     orcid: "https://orcid.org/0009-0000-6394-4912"
     affiliation: "Fractal Metascience Foundation, Tashkent"
 repository-code: "https://github.com/Secret-Uzbek/Uzbek-mining"
-abstract: "Academic archive of Uzbek mining industry, ESG reports and sustainable extraction."
+abstract: "Human-facing research branch around Uzbek mining, ESG reports, extractive industry memory, and sustainable extraction."
 keywords:
   - fractal-metascience
-  - fmp
+  - mining
   - uzbekistan
-  - open-science
+  - extractive-industry
+  - esg
 license: CC0-1.0
 date-released: "2026-03-03"
 version: "1.0.0"
-# doi: "10.5281/zenodo.TODO"
