@@ -1,22 +1,105 @@
-name: Release and Publish
+name: release-and-publish
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag, for example v1.0.1"
+        required: true
+        type: string
+      release_name:
+        description: "Optional human-readable release title"
+        required: false
+        type: string
+      target_ref:
+        description: "Optional branch or commit to release. Defaults to current ref."
+        required: false
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
-  release:
+  publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Create release bundle
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.target_ref || github.ref }}
+
+      - name: Resolve metadata
+        id: meta
+        shell: bash
         run: |
-          zip -r Uzbek-mining-${GITHUB_REF_NAME}.zip . -x ".git/*" ".github/*"
+          set -euo pipefail
+
+          tag="${{ inputs.tag_name }}"
+          name="${{ inputs.release_name }}"
+
+          if [ -z "$tag" ]; then
+            echo "tag_name is required." >&2
+            exit 1
+          fi
+
+          if [ -z "$name" ]; then
+            name="${GITHUB_REPOSITORY#*/} ${tag}"
+          fi
+
+          {
+            echo "tag=$tag"
+            echo "name=$name"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Ensure tag exists locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.meta.outputs.tag }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag already exists locally: $tag"
+          else
+            git tag "$tag" "$GITHUB_SHA"
+          fi
+
+      - name: Push tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin "${{ steps.meta.outputs.tag }}"
+
+      - name: Create release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          tag_name="${{ steps.meta.outputs.tag }}"
+          mkdir -p release
+          zip -r "release/${repo_name}-${tag_name}.zip" . -x ".git/*" -x "release/*"
+          sha256sum "release/${repo_name}-${tag_name}.zip" > "release/CHECKSUMS.txt"
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: Uzbek-mining-${{ github.ref_name }}.zip
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            release/${{ github.event.repository.name }}-${{ steps.meta.outputs.tag }}.zip
+            release/CHECKSUMS.txt
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo "## Release published"
+            echo "- Repository: \`${{ github.repository }}\`"
+            echo "- Tag: \`${{ steps.meta.outputs.tag }}\`"
+            echo "- Name: \`${{ steps.meta.outputs.name }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
